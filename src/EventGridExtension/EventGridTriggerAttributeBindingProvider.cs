@@ -5,6 +5,7 @@ using Microsoft.Azure.WebJobs.Extensions.Bindings;
 using Microsoft.Azure.WebJobs.Host.Bindings;
 using Microsoft.Azure.WebJobs.Host.Listeners;
 using Microsoft.Azure.WebJobs.Host.Protocols;
+using Microsoft.Azure.WebJobs.Host.Queues;
 using Microsoft.Azure.WebJobs.Host.Triggers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -13,6 +14,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.Azure.WebJobs.Host.Executors;
 
 namespace Microsoft.Azure.WebJobs.Extensions.EventGrid
 {
@@ -131,7 +133,11 @@ namespace Microsoft.Azure.WebJobs.Extensions.EventGrid
 
             public Task<IListener> CreateListenerAsync(ListenerFactoryContext context)
             {
-                return Task.FromResult<IListener>(new EventGridListener(context.Executor, _listenersStore, _functionName));
+                return Task.FromResult<IListener>(new EventGridListener(context.Executor,
+                                                context.Descriptor.Id,
+                                                context.SharedQueue,
+                                                _listenersStore,
+                                                _functionName));
             }
 
             public ParameterDescriptor ToParameterDescriptor()

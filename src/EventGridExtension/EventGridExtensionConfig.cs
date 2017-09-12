@@ -2,6 +2,7 @@
 using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Host.Executors;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,6 +42,11 @@ namespace Microsoft.Azure.WebJobs.Extensions.EventGrid
         internal void AddListener(string key, EventGridListener listener)
         {
             _listeners.Add(key, listener);
+        }
+
+        internal void RemoveListener(string key)
+        {
+            _listeners.Remove(key);
         }
 
         async Task<HttpResponseMessage> IAsyncConverter<HttpRequestMessage, HttpResponseMessage>.ConvertAsync(HttpRequestMessage input, CancellationToken cancellationToken)
@@ -83,16 +89,17 @@ namespace Microsoft.Azure.WebJobs.Extensions.EventGrid
             else if (String.Equals(eventTypeHeader, "Notification", StringComparison.OrdinalIgnoreCase))
             {
                 string jsonArray = await req.Content.ReadAsStringAsync();
-                List<EventGridEvent> events = JsonConvert.DeserializeObject<List<EventGridEvent>>(jsonArray);
-
-                foreach (var ev in events)
+                // string to list of JObject
+                List<JObject> events = JsonConvert.DeserializeObject<List<JObject>>(jsonArray);
+                if (events.Count <= 24)
                 {
-                    TriggeredFunctionData triggerData = new TriggeredFunctionData
-                    {
-                        TriggerValue = ev
-                    };
-
-                    await _listeners[functionName].Executor.TryExecuteAsync(triggerData, CancellationToken.None);
+                    // return HttpResponse until all function is executed
+                    await _listeners[functionName].ExecuteBatch(events, CancellationToken.None);
+                    // TODO return 200
+                }
+                else
+                {   // return HttpResponse until all message is enqueued
+                    await _listeners[functionName].EnqueueBatch(events, CancellationToken.None);
                 }
 
                 return new HttpResponseMessage(HttpStatusCode.Accepted);
