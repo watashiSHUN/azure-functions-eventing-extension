@@ -9,21 +9,20 @@ namespace Microsoft.Azure.WebJobs.Extensions.EventGrid
 {
     public class EventGridListener : Microsoft.Azure.WebJobs.Host.Listeners.IListener
     {
-        private readonly string _functionId; // TODO property
-        private SharedQueueHandler _sqHandler;
-        private EventGridMessageHandler _messageHandler;
+        private readonly DispatchProcessor _dispatchProcessor;
+        private readonly EventGridMessageHandler _messageHandler;
 
-        private EventGridExtensionConfig _listenersStore;
+        private readonly EventGridExtensionConfig _listenersStore;
         private readonly string _functionName;
 
         // TODO pass the context
-        public EventGridListener(ITriggeredFunctionExecutor executor, string functionId, SharedQueueHandler sqHandler, EventGridExtensionConfig listenersStore, string functionName)
+        public EventGridListener(ITriggeredFunctionExecutor executor, DispatchProcessorFactory factory, EventGridExtensionConfig listenersStore, string functionName)
         {
-            _functionId = functionId;
-            _sqHandler = sqHandler;
             _listenersStore = listenersStore;
             _functionName = functionName;
             _messageHandler = new EventGridMessageHandler(executor);
+            // register call
+            _dispatchProcessor = factory.CreateDispatchProcessor(_messageHandler);
         }
 
         public async Task ExecuteBatch(List<JObject> inputs, CancellationToken cancellationToken)
@@ -34,18 +33,16 @@ namespace Microsoft.Azure.WebJobs.Extensions.EventGrid
             }
         }
 
-        public async Task EnqueueBatch(List<JObject> inputs, CancellationToken cancellationToken)
+        public async Task DispatchBatch(List<JObject> inputs, CancellationToken cancellationToken)
         {
             foreach (var input in inputs)
             {
-                await _sqHandler.EnqueueAsync(input, _functionId, cancellationToken);
+                await _dispatchProcessor.ProcessAsync(input, cancellationToken);
             }
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            // register call back
-            _sqHandler.RegisterHandler(_functionId, _messageHandler);
             _listenersStore.AddListener(_functionName, this);
             return Task.FromResult(true);
         }
@@ -53,7 +50,6 @@ namespace Microsoft.Azure.WebJobs.Extensions.EventGrid
         public Task StopAsync(CancellationToken cancellationToken)
         {
             // calling order stop -> cancel -> dispose
-            _sqHandler.UnregisterHandler(_functionId);
             _listenersStore.RemoveListener(_functionName);
             return Task.FromResult(true);
         }

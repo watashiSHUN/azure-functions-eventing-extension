@@ -99,7 +99,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.EventGrid
                 }
                 else
                 {   // return HttpResponse until all message is enqueued
-                    await _listeners[functionName].EnqueueBatch(events, CancellationToken.None);
+                    await _listeners[functionName].DispatchBatch(events, CancellationToken.None);
                 }
 
                 return new HttpResponseMessage(HttpStatusCode.Accepted);

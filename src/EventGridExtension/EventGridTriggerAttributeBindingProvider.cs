@@ -134,8 +134,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.EventGrid
             public Task<IListener> CreateListenerAsync(ListenerFactoryContext context)
             {
                 return Task.FromResult<IListener>(new EventGridListener(context.Executor,
-                                                context.Descriptor.Id,
-                                                context.SharedQueue,
+                                                context.DispatchProcessorFactory,
                                                 _listenersStore,
                                                 _functionName));
             }
